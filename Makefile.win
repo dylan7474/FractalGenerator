@@ -1,0 +1,34 @@
+# Makefile for C/SDL2 projects cross-compiled for Windows
+#
+# This is a generic template for creating standalone executables.
+# It includes all necessary libraries for graphics, sound, fonts,
+# and networking to ensure compatibility.
+
+# The cross-compiler for 64-bit Windows.
+CC = x86_64-w64-mingw32-gcc
+
+# The name of the final Windows executable.
+TARGET = fractal.exe
+
+# All C source files used in the project.
+SRCS = main.c
+
+# CFLAGS: Flags passed to the C compiler.
+# We change from -O2 to -O3 for more aggressive optimization.
+CFLAGS = -I/usr/x86_64-w64-mingw32/include/SDL2 -Wall -O3 -lm
+
+# LDFLAGS: Flags passed to the linker.
+# This comprehensive list prevents most common linker errors.
+# It already includes -lpthread, which is required for multithreading.
+LDFLAGS = -L/usr/x86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lSDL2_ttf -lws2_32 -lpthread -lwininet -lm -mwindows \
+          -lgdi32 -luser32 -lversion -limm32 -lole32 -loleaut32 -lsetupapi -lwinmm -lrpcrt4 -static
+
+# --- Build Rules ---
+
+all: $(TARGET)
+
+$(TARGET): $(SRCS)
+	$(CC) $(CFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET)
