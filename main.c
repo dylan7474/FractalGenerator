@@ -23,8 +23,8 @@
 #endif
 
 // --- Constants ---
-const int SCREEN_WIDTH = 800;
-const int SCREEN_HEIGHT = 600;
+int SCREEN_WIDTH = 800;
+int SCREEN_HEIGHT = 600;
 const int MAX_ITERATIONS = 255; // Max iterations for Mandelbrot calculation
 
 // --- Structs ---
@@ -219,12 +219,19 @@ int main(int argc, char* argv[]) {
     // --- Initialization ---
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return 1;
 
+    SDL_DisplayMode dm;
+    if (SDL_GetDesktopDisplayMode(0, &dm) == 0) {
+        SCREEN_WIDTH = dm.w;
+        SCREEN_HEIGHT = dm.h;
+    }
+
     SDL_Window* window = SDL_CreateWindow("Mandelbrot - Click to change zoom target",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+        SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_FULLSCREEN_DESKTOP);
     if (!window) return 1;
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
+        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) return 1;
 
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
