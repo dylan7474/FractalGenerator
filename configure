@@ -1,0 +1,46 @@
+#!/bin/bash
+# Simple configuration script to check for required tools and libraries.
+
+MISSING=""
+
+check_cmd() {
+    local cmd=$1
+    local pkg=$2
+    printf "Checking for %s... " "$cmd"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        echo "found"
+    else
+        echo "not found"
+        MISSING+="$pkg "
+    fi
+}
+
+check_lib() {
+    local lib=$1
+    local pkg=$2
+    printf "Checking for library %s... " "$lib"
+    if pkg-config --exists "$pkg"; then
+        echo "found"
+    else
+        echo "not found"
+        MISSING+="$pkg "
+    fi
+}
+
+check_cmd gcc build-essential
+check_cmd sdl2-config libsdl2-dev
+check_cmd pkg-config pkg-config
+
+check_lib SDL2_ttf SDL2_ttf
+check_lib fftw3 fftw3
+
+if [ -n "$MISSING" ]; then
+    echo
+    echo "Missing dependencies detected. You can install them on Debian/Ubuntu with:";
+    echo "  sudo apt-get install $MISSING";
+    exit 1
+else
+    echo
+    echo "All required tools and libraries are available."
+    exit 0
+fi
