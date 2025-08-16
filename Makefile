@@ -13,7 +13,7 @@ TARGET = fractal
 SRCS = main.c
 
 # Use pkg-config to get the compiler flags for SDL2.
-CFLAGS = -Wall -O3 -march=native $(shell pkg-config --cflags sdl2) -pthread
+CFLAGS = -std=c11 -Wall -O3 -march=native $(shell pkg-config --cflags sdl2) -pthread
 
 # Use pkg-config for the base SDL2 library, and add others manually.
 # Note the addition of -pthread for multithreading.

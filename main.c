@@ -16,6 +16,7 @@
 #include <math.h>
 #include <pthread.h>     // For multithreading
 #include <SDL_cpuinfo.h> // To get the number of CPU cores
+#include <stdatomic.h>   // For dynamic work scheduling
 
 // --- MODIFIED: Conditionally include SSE2 header only for x86/x64 builds ---
 #if defined(__x86_64__) || defined(__i386__)
@@ -37,14 +38,15 @@ typedef struct {
 
 // Struct to pass arguments to each rendering thread
 typedef struct {
-    int thread_id;
-    int num_threads;
     void* pixels;
     int pitch;
     double center_r;
     double center_i;
     double zoom;
 } ThreadArgs;
+
+// Global row counter for dynamic scheduling
+static atomic_int next_row;
 
 
 // --- Mandelbrot Calculation ---
@@ -85,14 +87,10 @@ int periodicity_check(double cr, double ci) {
 
 /**
  * @brief The function executed by each thread.
- * It renders a horizontal slice of the fractal.
+ * It renders rows pulled from a shared counter to improve load balancing.
  */
 void* render_thread(void* args) {
     ThreadArgs* thread_args = (ThreadArgs*)args;
-
-    // Determine the Y-range this thread is responsible for
-    int start_y = (SCREEN_HEIGHT / thread_args->num_threads) * thread_args->thread_id;
-    int end_y = (SCREEN_HEIGHT / thread_args->num_threads) * (thread_args->thread_id + 1);
 
     // Get parameters from the args struct
     void* pixels = thread_args->pixels;
@@ -100,7 +98,7 @@ void* render_thread(void* args) {
     double center_r = thread_args->center_r;
     double center_i = thread_args->center_i;
     double zoom = thread_args->zoom;
-    
+
     double aspect_ratio = (double)SCREEN_WIDTH / (double)SCREEN_HEIGHT;
     double x_scale = (4.0 * aspect_ratio * zoom) / SCREEN_WIDTH;
     double y_scale = (4.0 * zoom) / SCREEN_WIDTH;
@@ -114,8 +112,9 @@ void* render_thread(void* args) {
     const __m128d _ones = _mm_set1_pd(1.0);
     const __m128d _two = _mm_set1_pd(2.0);
 
-    // Iterate over this thread's assigned portion of the pixels
-    for (int y = start_y; y < end_y; y++) {
+    while (1) {
+        int y = atomic_fetch_add(&next_row, 1);
+        if (y >= SCREEN_HEIGHT) break;
         Uint32* row = (Uint32*)((Uint8*)pixels + y * pitch);
         double ci_base = center_i + (y - SCREEN_HEIGHT / 2.0) * y_scale;
 
@@ -178,8 +177,9 @@ void* render_thread(void* args) {
 #else
     // --- Standard C (ARM / Fallback) Path ---
 
-    // Iterate over this thread's assigned portion of the pixels
-    for (int y = start_y; y < end_y; y++) {
+    while (1) {
+        int y = atomic_fetch_add(&next_row, 1);
+        if (y >= SCREEN_HEIGHT) break;
         Uint32* row = (Uint32*)((Uint8*)pixels + y * pitch);
         for (int x = 0; x < SCREEN_WIDTH; x++) {
             // Map pixel to complex plane
@@ -283,11 +283,11 @@ int main(int argc, char* argv[]) {
         int pitch;
         SDL_LockTexture(texture, NULL, &pixels, &pitch);
 
-        // Launch all threads
+        // Reset shared row counter and launch threads
+        atomic_store(&next_row, 0);
         for (int i = 0; i < num_threads; i++) {
-            thread_args[i] = (ThreadArgs){ .thread_id = i, .num_threads = num_threads,
-                .pixels = pixels, .pitch = pitch, .center_r = center_r,
-                .center_i = center_i, .zoom = zoom };
+            thread_args[i] = (ThreadArgs){ .pixels = pixels, .pitch = pitch,
+                .center_r = center_r, .center_i = center_i, .zoom = zoom };
             pthread_create(&threads[i], NULL, render_thread, &thread_args[i]);
         }
 
